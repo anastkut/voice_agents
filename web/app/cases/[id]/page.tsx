@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { Case, fetcher, patchCase, useLive } from "@/lib/api";
+import { addNote, Case, fetcher, patchCase, useLive } from "@/lib/api";
 import Transcript from "../../transcript";
 
 export default function CaseDetail() {
@@ -15,6 +15,7 @@ export default function CaseDetail() {
   const [status, setStatus] = useState<Case["status"]>("new");
   const [urgency, setUrgency] = useState<Case["urgency"]>("normal");
   const [notes, setNotes] = useState("");
+  const [note, setNote] = useState("");
   const [dirty, setDirty] = useState(false);
 
   // Re-seed the form from the server (e.g. a note added by voice) unless the user is mid-edit.
@@ -31,6 +32,13 @@ export default function CaseDetail() {
   const save = async () => {
     await patchCase(data.id, { status, urgency, notes });
     setDirty(false);
+    mutate();
+  };
+
+  const submitNote = async () => {
+    if (!note.trim()) return;
+    await addNote(data.id, note.trim());
+    setNote("");
     mutate();
   };
 
@@ -75,6 +83,23 @@ export default function CaseDetail() {
               <option value="urgent">urgent</option>
             </select>
           </div>
+        </div>
+
+        <label className="mb-1 block text-neutral-500">Add note</label>
+        <div className="mb-4 flex gap-2">
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitNote()}
+            placeholder="Type a note and press Enter…"
+            className="flex-1 rounded border border-neutral-300 px-2 py-1"
+          />
+          <button
+            onClick={submitNote}
+            className="rounded bg-neutral-700 px-3 py-1 font-medium text-white"
+          >
+            Add
+          </button>
         </div>
 
         <label className="mb-1 block text-neutral-500">Notes</label>

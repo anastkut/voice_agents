@@ -24,10 +24,12 @@ export default function CaseList() {
   const { data: calls } = useSWR<Call[]>("/calls", fetcher, { refreshInterval: 2000 });
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
+  const [urgency, setUrgency] = useState("all");
 
   const shown = (cases ?? []).filter(
     (c) =>
       (status === "all" || c.status === status) &&
+      (urgency === "all" || c.urgency === urgency) &&
       `${c.name} ${c.phone} ${c.description}`.toLowerCase().includes(q.toLowerCase())
   );
 
@@ -51,6 +53,16 @@ export default function CaseList() {
           <option value="new">new</option>
           <option value="in_progress">in progress</option>
           <option value="resolved">resolved</option>
+        </select>
+        <select
+          value={urgency}
+          onChange={(e) => setUrgency(e.target.value)}
+          className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
+        >
+          <option value="all">all urgencies</option>
+          <option value="urgent">urgent</option>
+          <option value="normal">normal</option>
+          <option value="low">low</option>
         </select>
       </div>
       {!cases ? (

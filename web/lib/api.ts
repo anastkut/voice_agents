@@ -55,6 +55,13 @@ export const patchCase = (id: number, body: Partial<Case>) =>
     body: JSON.stringify(body),
   }).then((r) => r.json());
 
+export const addNote = (id: number, text: string) =>
+  fetch(`${API}/cases/${id}/notes`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text, author: "staff" }),
+  }).then((r) => r.json());
+
 export const getToken = () =>
   fetcher("/livekit/token") as Promise<{ url: string; token: string }>;
 
