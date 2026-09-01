@@ -40,7 +40,7 @@ export default function CaseList() {
       (status === "all" || c.status === status) &&
       (urgency === "all" || c.urgency === urgency) &&
       (issue === "all" || c.issue_type === issue) &&
-      `${c.name} ${c.phone} ${c.description}`.toLowerCase().includes(q.toLowerCase())
+      `${c.id} ${c.description}`.toLowerCase().includes(q.toLowerCase())
   );
 
   return (
@@ -51,7 +51,7 @@ export default function CaseList() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, phone, description…"
+          placeholder="Search case number, description…"
           className="w-72 rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
         />
         <select
@@ -121,7 +121,7 @@ function ActiveCalls({ calls }: { calls: Call[] }) {
             Call {c.id} · started {new Date(c.started_at).toLocaleTimeString()} ·{" "}
             {c.case ? (
               <Link href={`/cases/${c.case.id}`} className="text-blue-700 hover:underline">
-                case {c.case.id} — {c.case.name}
+                case {c.case.id}
               </Link>
             ) : (
               <span className="text-neutral-500">collecting details…</span>
@@ -141,8 +141,7 @@ function CaseTable({ cases }: { cases: Case[] }) {
         <tr className="border-b border-neutral-200 text-left text-neutral-500">
           <th className="px-3 py-2 font-medium">#</th>
           <th className="px-3 py-2 font-medium">Created</th>
-          <th className="px-3 py-2 font-medium">Name</th>
-          <th className="px-3 py-2 font-medium">Phone</th>
+          <th className="px-3 py-2 font-medium">Description</th>
           <th className="px-3 py-2 font-medium">Issue</th>
           <th className="px-3 py-2 font-medium">Urgency</th>
           <th className="px-3 py-2 font-medium">Status</th>
@@ -157,10 +156,9 @@ function CaseTable({ cases }: { cases: Case[] }) {
               </Link>
             </td>
             <td className="px-3 py-2 text-neutral-500">{new Date(c.created_at).toLocaleString()}</td>
-            <td className="px-3 py-2">
-              <Link href={`/cases/${c.id}`} className="hover:underline">{c.name}</Link>
+            <td className="max-w-xs truncate px-3 py-2">
+              <Link href={`/cases/${c.id}`} className="hover:underline">{c.description}</Link>
             </td>
-            <td className="px-3 py-2">{c.phone}</td>
             <td className="px-3 py-2">{c.issue_type.replace("_", " ")}</td>
             <td className="px-3 py-2">
               <span className={`rounded px-2 py-0.5 text-xs font-medium ${URGENCY_STYLE[c.urgency]}`}>

@@ -48,8 +48,6 @@ export default function CaseDetail() {
       <h1 className="mt-2 mb-4 text-xl font-semibold">Case {data.id}</h1>
 
       <div className="mb-6 grid grid-cols-2 gap-x-8 gap-y-3 rounded bg-white p-4 text-sm shadow-sm">
-        <Field label="Name" value={data.name} />
-        <Field label="Phone" value={data.phone} />
         <Field label="Issue" value={data.issue_type.replace("_", " ")} />
         <Field label="Created" value={new Date(data.created_at).toLocaleString()} />
         <div className="col-span-2">

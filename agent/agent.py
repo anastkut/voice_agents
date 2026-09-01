@@ -22,11 +22,11 @@ You are the phone agent for EffiGov city services. You talk to residents by voic
 The entire call is in English; always reply in English even if a transcription line looks like another language.
 Speak plainly and briefly: one or two short sentences, one question at a time, no lists, no markdown, say digits one at a time. No filler and no repeated recaps. Ask only when information is missing, unclear, or contradictory — but then always ask.
 Three things you can do:
-1) New issue: collect full name, phone number, what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Before filing, repeat the name, phone number, and address back in one sentence to confirm; confirm other details only if unsure you heard them right. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. Then call create_case, tell them their case number, and mention once that staff typically review new cases within two business days.
-2) Existing request: ask for their phone number or case number, their full name, and a brief description of what the case is about. Call lookup_case and compare its result with what they told you: only if the name and description clearly match, share the status and offer to add a note with add_note. If they do not match, say you cannot share details on that case — do not reveal anything the tool returned and do not add notes. Never share case details based on a case number alone.
+1) New issue: collect what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. Then have them choose a verification question and answer only they would know (for example a childhood nickname) — no personal contact details are collected or stored. Repeat the location and their verification answer back once to confirm, call create_case, tell them their case number and to keep it for follow-ups, and mention once that staff typically review new cases within two business days.
+2) Existing request: ask for the case number and call lookup_case, then ask the caller its verification question. Only if their answer clearly matches the expected one, share the status and offer add_note. Otherwise say you cannot share details on that case — do not reveal anything the tool returned, do not add notes, and do not change it. Never share case details without a matching verification answer.
 3) Cancel a request: verify the caller exactly like an existing request (no verification needed for a case from this same call), then call cancel_case and confirm it is cancelled.
 If a verified caller says an existing problem got worse or better, adjust it with set_urgency.
-Ask for each piece of information at most once per call: once the caller gives their name, phone number, or case details, retain and reuse them for the rest of the call. Never re-ask, and never re-verify a case created or already verified in this same call.
+Ask for each piece of information at most once per call: once the caller gives details or passes verification, retain that for the rest of the call. Never re-ask, and never re-verify a case created or already verified in this same call.
 If the caller shares concrete, actionable extras (landmarks, access instructions, best times), save them with add_note; do not note general questions or chatter.
 If the caller asks for a human or you cannot help, make sure a case exists (create one if needed), add a note that they requested human follow-up, and say a staff member will call them back.
 Do not promise repair dates; if asked, say updates will appear on their case and staff review new cases within about two business days.
@@ -48,20 +48,22 @@ class IntakeAgent(Agent):
         await backend.patch(f"/calls/{self.call_id}", json={"case_id": case_id})
 
     @function_tool
-    async def create_case(self, name: str, phone: str, issue_type: IssueType, description: str,
+    async def create_case(self, issue_type: IssueType, description: str,
+                          secret_question: str, secret_answer: str,
                           urgency: Literal["low", "normal", "urgent"] = "normal") -> str:
         """File a new service request case.
 
         Args:
-            name: Caller's full name.
-            phone: Caller's phone number.
             issue_type: Category of the reported issue.
             description: Short description of the issue, including its location.
+            secret_question: Verification question the caller chose for future calls.
+            secret_answer: The caller's answer to that question.
             urgency: urgent for safety hazards or active damage, low for cosmetic issues.
         """
         r = await backend.post("/cases", json={
-            "name": name, "phone": phone, "issue_type": issue_type,
-            "description": description, "urgency": urgency, "actor": "caller",
+            "issue_type": issue_type, "description": description,
+            "secret_question": secret_question, "secret_answer": secret_answer,
+            "urgency": urgency, "actor": "caller",
         })
         r.raise_for_status()
         case_id = r.json()["id"]
@@ -69,24 +71,21 @@ class IntakeAgent(Agent):
         return f"Created case number {case_id}."
 
     @function_tool
-    async def lookup_case(self, phone: str = "", case_id: int = 0) -> str:
-        """Look up an existing case by phone number or case number.
+    async def lookup_case(self, case_id: int) -> str:
+        """Look up an existing case by case number. Ask the caller the returned
+        verification question before sharing anything from the result.
 
         Args:
-            phone: Caller's phone number, if they gave one.
-            case_id: Case number, if they gave one.
+            case_id: Case number.
         """
-        if case_id:
-            r = await backend.get(f"/cases/{case_id}")
-            case = r.json() if r.status_code == 200 else None
-        else:
-            cases = (await backend.get("/cases", params={"phone": phone})).json()
-            case = cases[0] if cases else None
-        if not case:
+        r = await backend.get(f"/cases/{case_id}")
+        if r.status_code != 200:
             return "No case found."
+        case = r.json()
         await self._link_case(case["id"])
-        return (f"Case {case['id']}, filed by {case['name']}, about: {case['description']}. "
-                f"Issue type {case['issue_type']}, status {case['status']}. Notes: {case['notes'] or 'none'}.")
+        return (f"Case {case['id']}: {case['issue_type']}, status {case['status']}, "
+                f"about: {case['description']}. Verification question: {case['secret_question']} "
+                f"Expected answer: {case['secret_answer']}. Notes: {case['notes'] or 'none'}.")
 
     @function_tool
     async def set_urgency(self, case_id: int, urgency: Literal["low", "normal", "urgent"]) -> str:

@@ -9,8 +9,8 @@ export type Case = {
   updated_at: string;
   status: "new" | "triaged" | "scheduled" | "in_progress" | "resolved" | "cancelled";
   urgency: "low" | "normal" | "urgent";
-  name: string;
-  phone: string;
+  secret_question: string;
+  secret_answer: string;
   issue_type: string;
   description: string;
   notes: string;

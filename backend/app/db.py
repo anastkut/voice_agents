@@ -1,4 +1,3 @@
-import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,7 +8,7 @@ conn.execute("""
     CREATE TABLE IF NOT EXISTS cases (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         created_at TEXT, updated_at TEXT, status TEXT, urgency TEXT DEFAULT 'normal',
-        name TEXT, phone TEXT, issue_type TEXT, description TEXT,
+        secret_question TEXT, secret_answer TEXT, issue_type TEXT, description TEXT,
         notes TEXT DEFAULT ''
     )
 """)
@@ -40,18 +39,14 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
 
-def normalize_phone(s: str) -> str:
-    return re.sub(r"\D", "", s)
-
-
-def create_case(name: str, phone: str, issue_type: str, description: str,
-                urgency: str, actor: str = "staff") -> dict:
+def create_case(issue_type: str, description: str, secret_question: str,
+                secret_answer: str, urgency: str, actor: str = "staff") -> dict:
     ts = now()
     with conn:
         cur = conn.execute(
-            "INSERT INTO cases (created_at, updated_at, status, urgency, name, phone, issue_type, description)"
-            " VALUES (?, ?, 'new', ?, ?, ?, ?, ?)",
-            (ts, ts, urgency, name, normalize_phone(phone), issue_type, description),
+            "INSERT INTO cases (created_at, updated_at, status, urgency, secret_question,"
+            " secret_answer, issue_type, description) VALUES (?, ?, 'new', ?, ?, ?, ?, ?)",
+            (ts, ts, urgency, secret_question, secret_answer, issue_type, description),
         )
         conn.execute(
             "INSERT INTO case_events (case_id, ts, actor, field, old, new) VALUES (?, ?, ?, 'created', '', ?)",
@@ -59,11 +54,8 @@ def create_case(name: str, phone: str, issue_type: str, description: str,
     return get_case(cur.lastrowid)
 
 
-def list_cases(phone: str | None = None) -> list[dict]:
-    sql, args = "SELECT * FROM cases", ()
-    if phone:
-        sql, args = sql + " WHERE phone = ?", (normalize_phone(phone),)
-    return [dict(r) for r in conn.execute(sql + " ORDER BY id DESC", args)]
+def list_cases() -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT * FROM cases ORDER BY id DESC")]
 
 
 def get_case(case_id: int) -> dict | None:
