@@ -56,9 +56,9 @@ as an exit. Records are never deleted.
 - **Caller** (via agent tools): create a case, look up / note / re-prioritize /
   cancel their own. No personal contact details are stored: at creation the backend
   generates a four-word passphrase (read to the caller once), and follow-up lookups
-  go through `/cases/{id}/verify`, which compares server-side and returns the same
-  "not found" whether the id or the phrase is wrong — the LLM never sees the stored
-  passphrase, and a case's existence is never disclosed without a match.
+  go through `/cases/verify`, which compares server-side (case number optional) and
+  returns the same "not found" for a wrong id or wrong phrase — the LLM never sees
+  the stored passphrase, and a case's existence is never disclosed without a match.
 - **Staff** (dashboard): everything, including the workflow ladder.
 - **Supervisor** (post-call LLM pass): annotate only.
 

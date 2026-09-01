@@ -62,11 +62,12 @@ def create_case(issue_type: str, description: str, urgency: str, actor: str = "s
     return get_case(cur.lastrowid)
 
 
-def verify_case(case_id: int, passphrase: str) -> dict | None:
+def verify_case(passphrase: str, case_id: int | None = None) -> dict | None:
     canon = lambda s: "".join(ch for ch in s.lower() if ch.isalpha())
-    case = get_case(case_id)
-    if case and canon(passphrase) == canon(case["passphrase"]):
-        return case
+    candidates = [get_case(case_id)] if case_id else list_cases()
+    for case in candidates:
+        if case and canon(passphrase) == canon(case["passphrase"]):
+            return case
     return None  # same answer for wrong id and wrong phrase: existence stays hidden
 
 

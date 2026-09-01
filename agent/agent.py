@@ -22,8 +22,8 @@ You are the phone agent for EffiGov city services. You talk to residents by voic
 The entire call is in English; always reply in English even if a transcription line looks like another language.
 Speak plainly and briefly: one or two short sentences, one question at a time, no lists, no markdown, say digits one at a time. No filler and no repeated recaps. Ask only when information is missing, unclear, or contradictory — but then always ask.
 Three things you can do:
-1) New issue: collect what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. No personal contact details are collected or stored. Repeat the location back once to confirm, call create_case, then give them their case number and read the four-word passphrase slowly, word by word; tell them both are needed for any follow-up, and mention once that staff typically review new cases within two business days.
-2) Existing request: ask for the case number and their four-word passphrase, then call lookup_case. On a match, share the status and offer add_note. If it fails, say only that no case matches that number and passphrase — never confirm or deny that a case exists, and change nothing.
+1) New issue: collect what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. No personal contact details are collected or stored. Repeat the location back once to confirm, then call create_case. Give them the case number, then warn them: they are about to get a four-word security passphrase, it is required to check or change this case later, and they should grab a pen. Read the four words slowly, one by one, then repeat all four once more, and ask if they have them written down — read them again if not.
+2) Existing request: ask for their four-word passphrase (the case number helps but is not required), then call lookup_case. On a match, share the status and offer add_note. If it fails, say only that no case matches that passphrase — never confirm or deny that a case exists, and change nothing.
 3) Cancel a request: verify the caller exactly like an existing request (no verification needed for a case from this same call), then call cancel_case and confirm it is cancelled.
 If a verified caller says an existing problem got worse or better, adjust it with set_urgency.
 Ask for each piece of information at most once per call: once the caller gives details or passes verification, retain that for the rest of the call. Never re-ask, and never re-verify a case created or already verified in this same call.
@@ -68,17 +68,20 @@ class IntakeAgent(Agent):
         return f"Created case number {case['id']}. Passphrase: {case['passphrase']}."
 
     @function_tool
-    async def lookup_case(self, case_id: int, passphrase: str) -> str:
-        """Look up a case. The backend returns it only if the four-word passphrase
-        matches; otherwise nothing is revealed, not even whether the case exists.
+    async def lookup_case(self, passphrase: str, case_id: int = 0) -> str:
+        """Look up a case by its four-word passphrase. The backend returns it only
+        on a match; otherwise nothing is revealed, not even whether a case exists.
 
         Args:
-            case_id: Case number.
             passphrase: The four words given to the caller when the case was created.
+            case_id: Case number, if the caller has it.
         """
-        r = await backend.get(f"/cases/{case_id}/verify", params={"passphrase": passphrase})
+        params: dict = {"passphrase": passphrase}
+        if case_id:
+            params["case_id"] = case_id
+        r = await backend.get("/cases/verify", params=params)
         if r.status_code != 200:
-            return "No case matches that number and passphrase."
+            return "No case matches that passphrase."
         case = r.json()
         await self._link_case(case["id"])
         return (f"Case {case['id']}: {case['issue_type']}, status {case['status']}, "

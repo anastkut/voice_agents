@@ -101,9 +101,9 @@ async def list_cases():
     return db.list_cases()
 
 
-@app.get("/cases/{case_id}/verify")
-async def verify_case(case_id: int, passphrase: str):
-    return case_or_404(db.verify_case(case_id, passphrase))
+@app.get("/cases/verify")
+async def verify_case(passphrase: str, case_id: int | None = None):
+    return case_or_404(db.verify_case(passphrase, case_id))
 
 
 @app.get("/cases/{case_id}")
