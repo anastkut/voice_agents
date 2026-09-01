@@ -71,6 +71,7 @@ export default function CaseDetail() {
               <option value="scheduled">scheduled</option>
               <option value="in_progress">in progress</option>
               <option value="resolved">resolved</option>
+              <option value="cancelled">cancelled</option>
             </select>
           </div>
           <div>

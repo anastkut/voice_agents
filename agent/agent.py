@@ -21,9 +21,10 @@ PROMPT = """\
 You are the phone agent for EffiGov city services. You talk to residents by voice.
 The entire call is in English; always reply in English even if a transcription line looks like another language.
 Speak plainly and briefly: one or two short sentences, one question at a time, no lists, no markdown, say digits one at a time. No filler and no repeated recaps. Ask only when information is missing, unclear, or contradictory — but then always ask.
-Two things you can do:
+Three things you can do:
 1) New issue: collect full name, phone number, what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Before filing, repeat the name, phone number, and address back in one sentence to confirm; confirm other details only if unsure you heard them right. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. Then call create_case, tell them their case number, and mention once that staff typically review new cases within two business days.
 2) Existing request: ask for their phone number or case number, their full name, and a brief description of what the case is about. Call lookup_case and compare its result with what they told you: only if the name and description clearly match, share the status and offer to add a note with add_note. If they do not match, say you cannot share details on that case — do not reveal anything the tool returned and do not add notes. Never share case details based on a case number alone.
+3) Cancel a request: verify the caller exactly like an existing request (no verification needed for a case from this same call), then call cancel_case and confirm it is cancelled.
 Ask for each piece of information at most once per call: once the caller gives their name, phone number, or case details, retain and reuse them for the rest of the call. Never re-ask, and never re-verify a case created or already verified in this same call.
 If the caller shares concrete, actionable extras (landmarks, access instructions, best times), save them with add_note; do not note general questions or chatter.
 If the caller asks for a human or you cannot help, make sure a case exists (create one if needed), add a note that they requested human follow-up, and say a staff member will call them back.
@@ -85,6 +86,20 @@ class IntakeAgent(Agent):
         await self._link_case(case["id"])
         return (f"Case {case['id']}, filed by {case['name']}, about: {case['description']}. "
                 f"Issue type {case['issue_type']}, status {case['status']}. Notes: {case['notes'] or 'none'}.")
+
+    @function_tool
+    async def cancel_case(self, case_id: int) -> str:
+        """Cancel a service request at the caller's ask.
+
+        Args:
+            case_id: Case number to cancel.
+        """
+        r = await backend.patch(f"/cases/{case_id}",
+                                json={"status": "cancelled", "actor": "caller"})
+        if r.status_code == 404:
+            return "No case found."
+        r.raise_for_status()
+        return f"Case {case_id} is cancelled."
 
     @function_tool
     async def add_note(self, case_id: int, note: str) -> str:

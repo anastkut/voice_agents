@@ -12,6 +12,7 @@ const STATUS_STYLE: Record<Case["status"], string> = {
   scheduled: "bg-cyan-100 text-cyan-800",
   in_progress: "bg-amber-100 text-amber-800",
   resolved: "bg-green-100 text-green-800",
+  cancelled: "bg-neutral-200 text-neutral-600",
 };
 
 const URGENCY_STYLE: Record<Case["urgency"], string> = {
@@ -64,6 +65,7 @@ export default function CaseList() {
           <option value="scheduled">scheduled</option>
           <option value="in_progress">in progress</option>
           <option value="resolved">resolved</option>
+          <option value="cancelled">cancelled</option>
         </select>
         <select
           value={urgency}

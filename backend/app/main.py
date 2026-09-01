@@ -34,7 +34,7 @@ class CaseIn(BaseModel):
 
 
 class CasePatch(BaseModel):
-    status: Literal["new", "triaged", "scheduled", "in_progress", "resolved"] | None = None
+    status: Literal["new", "triaged", "scheduled", "in_progress", "resolved", "cancelled"] | None = None
     urgency: Urgency | None = None
     notes: str | None = None
     issue_type: IssueType | None = None
