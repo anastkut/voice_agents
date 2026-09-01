@@ -60,7 +60,7 @@ class IntakeAgent(Agent):
         """
         r = await backend.post("/cases", json={
             "name": name, "phone": phone, "issue_type": issue_type,
-            "description": description, "urgency": urgency,
+            "description": description, "urgency": urgency, "actor": "caller",
         })
         r.raise_for_status()
         case_id = r.json()["id"]
@@ -152,6 +152,9 @@ async def entrypoint(ctx: JobContext):
                 lines.append(f"tool: {m.output}")
         transcript = "\n".join(lines)
         summary = None
+        if sum(l.startswith("user:") for l in lines) < 2:  # nothing worth summarizing
+            await backend.patch(f"/calls/{call_id}", json={"ended": True})
+            return
         try:
             resp = await oai.chat.completions.create(
                 model=os.environ["LLM_MODEL"],

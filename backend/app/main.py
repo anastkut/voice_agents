@@ -31,6 +31,7 @@ class CaseIn(BaseModel):
     issue_type: IssueType
     description: str
     urgency: Urgency = "normal"
+    actor: Literal["staff", "caller"] = "staff"
 
 
 class CasePatch(BaseModel):
@@ -92,7 +93,8 @@ async def ws_updates(ws: WebSocket):
 
 @app.post("/cases")
 async def create_case(body: CaseIn):
-    case = db.create_case(body.name, body.phone, body.issue_type, body.description, body.urgency)
+    case = db.create_case(body.name, body.phone, body.issue_type, body.description,
+                          body.urgency, body.actor)
     await broadcast({"type": "case", "case_id": case["id"]})
     return case
 

@@ -44,7 +44,8 @@ def normalize_phone(s: str) -> str:
     return re.sub(r"\D", "", s)
 
 
-def create_case(name: str, phone: str, issue_type: str, description: str, urgency: str) -> dict:
+def create_case(name: str, phone: str, issue_type: str, description: str,
+                urgency: str, actor: str = "staff") -> dict:
     ts = now()
     with conn:
         cur = conn.execute(
@@ -52,6 +53,9 @@ def create_case(name: str, phone: str, issue_type: str, description: str, urgenc
             " VALUES (?, ?, 'new', ?, ?, ?, ?, ?)",
             (ts, ts, urgency, name, normalize_phone(phone), issue_type, description),
         )
+        conn.execute(
+            "INSERT INTO case_events (case_id, ts, actor, field, old, new) VALUES (?, ?, ?, 'created', '', ?)",
+            (cur.lastrowid, ts, actor, issue_type))
     return get_case(cur.lastrowid)
 
 

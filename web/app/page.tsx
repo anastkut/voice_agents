@@ -87,6 +87,9 @@ export default function CaseList() {
             <option key={t} value={t}>{t.replaceAll("_", " ")}</option>
           ))}
         </select>
+        <span className="self-center text-sm text-neutral-500">
+          {shown.length} of {cases?.length ?? 0}
+        </span>
       </div>
       {!cases ? (
         <p className="text-neutral-500">Loading…</p>
