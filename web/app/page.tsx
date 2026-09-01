@@ -87,6 +87,14 @@ export default function CaseList() {
             <option key={t} value={t}>{t.replaceAll("_", " ")}</option>
           ))}
         </select>
+        {(q !== "" || status !== "all" || urgency !== "all" || issue !== "all") && (
+          <button
+            onClick={() => { setQ(""); setStatus("all"); setUrgency("all"); setIssue("all"); }}
+            className="self-center text-sm text-neutral-500 hover:text-neutral-900"
+          >
+            × clear
+          </button>
+        )}
         <span className="self-center text-sm text-neutral-500">
           {shown.length} of {cases?.length ?? 0}
         </span>
