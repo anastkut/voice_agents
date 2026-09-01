@@ -1,11 +1,16 @@
 # EffiGov Voice Intake Demo
 
-A resident calls an AI voice agent, the agent files or looks up service-request
-cases through the backend, and staff triage them on the dashboard.
+A resident calls an AI voice agent; the agent files, looks up, annotates, escalates,
+or cancels service-request cases through the backend; staff triage them on a live
+dashboard (streaming transcripts, post-call summaries, full audit history).
 
-- `backend/` — FastAPI + SQLite, owns all case data
-- `agent/` — LiveKit voice agent (OpenAI LLM/STT/TTS), an HTTP client of the backend
-- `web/` — Next.js dashboard: case list, case detail, resident call page
+- `backend/` — FastAPI + SQLite, the single source of truth. Every write broadcasts
+  a websocket ping; the dashboard refetches on ping (2s polling as fallback).
+- `agent/` — LiveKit voice agent (OpenAI LLM/STT/TTS via env-configurable,
+  OpenAI-compatible endpoints). A stateless HTTP client of the backend with five
+  tools; on hang-up it writes a call summary and a supervisor review.
+- `web/` — Next.js dashboard: case list with filters, case detail with transcripts
+  and history, resident call page at /call.
 
 ## Run
 
@@ -25,5 +30,6 @@ cd web && npm i && npm run dev
 ```
 
 Open http://localhost:3000 (staff dashboard) and http://localhost:3000/call
-(resident call). For a terminal-only voice session without the browser or
-LiveKit server: `uv run agent.py console`.
+(resident call). Terminal-only voice session without the browser or LiveKit
+server: `uv run agent.py console`. Reset all data: `rm backend/effigov.db`
+and restart the backend.
