@@ -13,6 +13,20 @@ conn.execute("""
         notes TEXT DEFAULT ''
     )
 """)
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS calls (
+        id TEXT PRIMARY KEY,
+        case_id INTEGER REFERENCES cases(id),
+        started_at TEXT, ended_at TEXT
+    )
+""")
+conn.execute("""
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        call_id TEXT REFERENCES calls(id),
+        ts TEXT, role TEXT, text TEXT
+    )
+""")
 
 
 def now() -> str:
@@ -62,3 +76,46 @@ def add_note(case_id: int, text: str, author: str) -> dict | None:
         return None
     stamp = datetime.now(timezone.utc).strftime("%H:%M")
     return update_case(case_id, {"notes": case["notes"] + f"[{stamp} {author}] {text}\n"})
+
+
+def create_call(call_id: str) -> dict:
+    with conn:
+        conn.execute("INSERT INTO calls (id, started_at) VALUES (?, ?)", (call_id, now()))
+    return get_call(call_id)
+
+
+def get_call(call_id: str) -> dict | None:
+    row = conn.execute("SELECT * FROM calls WHERE id = ?", (call_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_call(call_id: str, fields: dict) -> dict | None:
+    if not get_call(call_id):
+        return None
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with conn:
+        conn.execute(f"UPDATE calls SET {cols} WHERE id = ?", (*fields.values(), call_id))
+    return get_call(call_id)
+
+
+def add_message(call_id: str, role: str, text: str) -> dict:
+    with conn:
+        cur = conn.execute("INSERT INTO messages (call_id, ts, role, text) VALUES (?, ?, ?, ?)",
+                           (call_id, now(), role, text))
+    return dict(conn.execute("SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+def call_messages(call_id: str) -> list[dict]:
+    return [dict(r) for r in conn.execute(
+        "SELECT * FROM messages WHERE call_id = ? ORDER BY id", (call_id,))]
+
+
+def active_calls() -> list[dict]:
+    rows = conn.execute("SELECT * FROM calls WHERE ended_at IS NULL ORDER BY started_at DESC")
+    return [dict(r) | {"case": get_case(r["case_id"]) if r["case_id"] else None,
+                       "messages": call_messages(r["id"])} for r in rows]
+
+
+def case_calls(case_id: int) -> list[dict]:
+    rows = conn.execute("SELECT * FROM calls WHERE case_id = ? ORDER BY started_at", (case_id,))
+    return [dict(r) | {"messages": call_messages(r["id"])} for r in rows]

@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { Case, fetcher, patchCase } from "@/lib/api";
+import { Case, fetcher, patchCase, useLive } from "@/lib/api";
+import Transcript from "../../transcript";
 
 export default function CaseDetail() {
+  useLive();
   const { id } = useParams<{ id: string }>();
   const { data, mutate } = useSWR<Case>(`/cases/${id}`, fetcher, { refreshInterval: 2000 });
 
@@ -76,6 +78,21 @@ export default function CaseDetail() {
           updated {new Date(data.updated_at).toLocaleString()}
         </span>
       </div>
+
+      {data.calls?.map((call) => (
+        <div key={call.id} className="mt-6 rounded bg-white p-4 text-sm shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">Call {call.id}</span>
+            {!call.ended_at && (
+              <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                live
+              </span>
+            )}
+            <span className="text-neutral-400">{new Date(call.started_at).toLocaleString()}</span>
+          </div>
+          <Transcript messages={call.messages} />
+        </div>
+      ))}
     </>
   );
 }
