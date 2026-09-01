@@ -21,6 +21,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"],
                    allow_methods=["*"], allow_headers=["*"])
 
 IssueType = Literal["missed_pickup", "pothole", "streetlight", "water_leak", "other"]
+Urgency = Literal["low", "normal", "urgent"]
 
 
 class CaseIn(BaseModel):
@@ -28,13 +29,16 @@ class CaseIn(BaseModel):
     phone: str
     issue_type: IssueType
     description: str
+    urgency: Urgency = "normal"
 
 
 class CasePatch(BaseModel):
     status: Literal["new", "in_progress", "resolved"] | None = None
+    urgency: Urgency | None = None
     notes: str | None = None
     issue_type: IssueType | None = None
     description: str | None = None
+    actor: Literal["staff", "caller"] = "staff"
 
 
 class NoteIn(BaseModel):
@@ -49,6 +53,7 @@ class CallIn(BaseModel):
 class CallPatch(BaseModel):
     case_id: int | None = None
     ended: bool | None = None
+    summary: str | None = None
 
 
 class MessageIn(BaseModel):
@@ -86,7 +91,7 @@ async def ws_updates(ws: WebSocket):
 
 @app.post("/cases")
 async def create_case(body: CaseIn):
-    case = db.create_case(body.name, body.phone, body.issue_type, body.description)
+    case = db.create_case(body.name, body.phone, body.issue_type, body.description, body.urgency)
     await broadcast({"type": "case", "case_id": case["id"]})
     return case
 
@@ -98,12 +103,15 @@ async def list_cases(phone: str | None = None):
 
 @app.get("/cases/{case_id}")
 async def get_case(case_id: int):
-    return case_or_404(db.get_case(case_id)) | {"calls": db.case_calls(case_id)}
+    return case_or_404(db.get_case(case_id)) | {
+        "calls": db.case_calls(case_id), "events": db.case_events(case_id)}
 
 
 @app.patch("/cases/{case_id}")
 async def patch_case(case_id: int, body: CasePatch):
-    case = case_or_404(db.update_case(case_id, body.model_dump(exclude_none=True)))
+    fields = body.model_dump(exclude_none=True)
+    actor = fields.pop("actor")
+    case = case_or_404(db.update_case(case_id, fields, actor))
     await broadcast({"type": "case", "case_id": case_id})
     return case
 
@@ -127,6 +135,8 @@ async def patch_call(call_id: str, body: CallPatch):
     fields: dict = {}
     if body.case_id is not None:
         fields["case_id"] = body.case_id
+    if body.summary is not None:
+        fields["summary"] = body.summary
     if body.ended:
         fields["ended_at"] = db.now()
     call = case_or_404(db.update_call(call_id, fields))

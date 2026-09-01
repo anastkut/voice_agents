@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import useSWR from "swr";
 import { Call, Case, fetcher, useLive } from "@/lib/api";
 import Transcript from "./transcript";
@@ -11,21 +12,53 @@ const STATUS_STYLE: Record<Case["status"], string> = {
   resolved: "bg-green-100 text-green-800",
 };
 
+const URGENCY_STYLE: Record<Case["urgency"], string> = {
+  low: "bg-neutral-100 text-neutral-500",
+  normal: "bg-neutral-100 text-neutral-700",
+  urgent: "bg-red-100 text-red-800",
+};
+
 export default function CaseList() {
   useLive();
   const { data: cases } = useSWR<Case[]>("/cases", fetcher, { refreshInterval: 2000 });
   const { data: calls } = useSWR<Call[]>("/calls", fetcher, { refreshInterval: 2000 });
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("all");
+
+  const shown = (cases ?? []).filter(
+    (c) =>
+      (status === "all" || c.status === status) &&
+      `${c.name} ${c.phone} ${c.description}`.toLowerCase().includes(q.toLowerCase())
+  );
 
   return (
     <>
       {calls && calls.length > 0 && <ActiveCalls calls={calls} />}
       <h1 className="mb-4 text-xl font-semibold">Cases</h1>
+      <div className="mb-3 flex gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name, phone, description…"
+          className="w-72 rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
+        />
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
+        >
+          <option value="all">all statuses</option>
+          <option value="new">new</option>
+          <option value="in_progress">in progress</option>
+          <option value="resolved">resolved</option>
+        </select>
+      </div>
       {!cases ? (
         <p className="text-neutral-500">Loading…</p>
-      ) : cases.length === 0 ? (
-        <p className="text-neutral-500">No cases yet.</p>
+      ) : shown.length === 0 ? (
+        <p className="text-neutral-500">No matching cases.</p>
       ) : (
-        <CaseTable cases={cases} />
+        <CaseTable cases={shown} />
       )}
     </>
   );
@@ -65,6 +98,7 @@ function CaseTable({ cases }: { cases: Case[] }) {
           <th className="px-3 py-2 font-medium">Name</th>
           <th className="px-3 py-2 font-medium">Phone</th>
           <th className="px-3 py-2 font-medium">Issue</th>
+          <th className="px-3 py-2 font-medium">Urgency</th>
           <th className="px-3 py-2 font-medium">Status</th>
         </tr>
       </thead>
@@ -82,6 +116,11 @@ function CaseTable({ cases }: { cases: Case[] }) {
             </td>
             <td className="px-3 py-2">{c.phone}</td>
             <td className="px-3 py-2">{c.issue_type.replace("_", " ")}</td>
+            <td className="px-3 py-2">
+              <span className={`rounded px-2 py-0.5 text-xs font-medium ${URGENCY_STYLE[c.urgency]}`}>
+                {c.urgency}
+              </span>
+            </td>
             <td className="px-3 py-2">
               <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[c.status]}`}>
                 {c.status.replace("_", " ")}

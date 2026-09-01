@@ -7,10 +7,12 @@ import httpx
 from dotenv import find_dotenv, load_dotenv
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext, cli, function_tool
 from livekit.plugins import openai, silero
+from openai import AsyncOpenAI
 
 load_dotenv(find_dotenv())
 
 backend = httpx.AsyncClient(base_url=os.environ["BACKEND_URL"], timeout=10)
+oai = AsyncOpenAI(base_url=os.environ["LLM_BASE_URL"], api_key=os.environ["LLM_API_KEY"])
 
 GREETING = ("Thanks for calling EffiGov city services. "
             "Are you reporting a new issue, or checking on an existing request?")
@@ -20,9 +22,10 @@ You are the phone agent for EffiGov city services. You talk to residents by voic
 The entire call is in English; always reply in English even if a transcription line looks like another language.
 Speak plainly: one or two short sentences, one question at a time, no lists, no markdown, say digits one at a time.
 Two things you can do:
-1) New issue: collect full name, phone number, issue type (missed trash pickup, pothole, streetlight, water leak, or other), where the issue is located, and a short description; include the location in the description. Then call create_case, tell them their case number, and mention staff typically review new cases within two business days.
+1) New issue: collect full name, phone number, issue type (missed trash pickup, pothole, streetlight, water leak, or other), where the issue is located, and a short description; include the location in the description. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. Then call create_case, tell them their case number, and mention staff typically review new cases within two business days.
 2) Existing request: ask for their phone number or case number, their full name, and a brief description of what the case is about. Call lookup_case and compare its result with what they told you: only if the name and description clearly match, share the status and offer to add a note with add_note. If they do not match, say you cannot share details on that case — do not reveal anything the tool returned and do not add notes. Never share case details based on a case number alone.
 Ask for each piece of information at most once per call: once the caller gives their name, phone number, or case details, retain and reuse them for the rest of the call. Never re-ask, and never re-verify a case created or already verified in this same call.
+If the caller shares extra useful details at any point (landmarks, access instructions, best times), save them to the case with add_note.
 Do not promise repair dates; if asked, say updates will appear on their case and staff review new cases within about two business days.
 Never invent case numbers or statuses; only report what tools return. If a tool fails, apologize and suggest calling back later.
 When the caller is done, thank them and say goodbye."""
@@ -39,17 +42,20 @@ class IntakeAgent(Agent):
         await backend.patch(f"/calls/{self.call_id}", json={"case_id": case_id})
 
     @function_tool
-    async def create_case(self, name: str, phone: str, issue_type: IssueType, description: str) -> str:
+    async def create_case(self, name: str, phone: str, issue_type: IssueType, description: str,
+                          urgency: Literal["low", "normal", "urgent"] = "normal") -> str:
         """File a new service request case.
 
         Args:
             name: Caller's full name.
             phone: Caller's phone number.
             issue_type: Category of the reported issue.
-            description: Short description of the issue.
+            description: Short description of the issue, including its location.
+            urgency: urgent for safety hazards or active damage, low for cosmetic issues.
         """
         r = await backend.post("/cases", json={
-            "name": name, "phone": phone, "issue_type": issue_type, "description": description,
+            "name": name, "phone": phone, "issue_type": issue_type,
+            "description": description, "urgency": urgency,
         })
         r.raise_for_status()
         case_id = r.json()["id"]
@@ -118,7 +124,18 @@ async def entrypoint(ctx: JobContext):
                                              json={"role": item.role, "text": item.text_content}))
 
     async def mark_ended():
-        await backend.patch(f"/calls/{call_id}", json={"ended": True})
+        lines = [f"{m.role}: {m.text_content}" for m in session.history.items
+                 if getattr(m, "role", None) in ("user", "assistant") and m.text_content]
+        try:
+            resp = await oai.chat.completions.create(
+                model=os.environ["LLM_MODEL"],
+                messages=[{"role": "user", "content":
+                           "Summarize this city-services call in two sentences for staff:"
+                           " issue, caller, outcome.\n\n" + "\n".join(lines)}])
+            summary = resp.choices[0].message.content
+        except Exception:
+            summary = None  # the call must still be marked ended
+        await backend.patch(f"/calls/{call_id}", json={"ended": True, "summary": summary})
 
     ctx.add_shutdown_callback(mark_ended)
 

@@ -13,6 +13,7 @@ export default function CaseDetail() {
   const { data, mutate } = useSWR<Case>(`/cases/${id}`, fetcher, { refreshInterval: 2000 });
 
   const [status, setStatus] = useState<Case["status"]>("new");
+  const [urgency, setUrgency] = useState<Case["urgency"]>("normal");
   const [notes, setNotes] = useState("");
   const [dirty, setDirty] = useState(false);
 
@@ -20,6 +21,7 @@ export default function CaseDetail() {
   useEffect(() => {
     if (data && !dirty) {
       setStatus(data.status);
+      setUrgency(data.urgency);
       setNotes(data.notes);
     }
   }, [data, dirty]);
@@ -27,7 +29,7 @@ export default function CaseDetail() {
   if (!data) return <p className="text-neutral-500">Loading…</p>;
 
   const save = async () => {
-    await patchCase(data.id, { status, notes });
+    await patchCase(data.id, { status, urgency, notes });
     setDirty(false);
     mutate();
   };
@@ -48,16 +50,32 @@ export default function CaseDetail() {
       </div>
 
       <div className="rounded bg-white p-4 text-sm shadow-sm">
-        <label className="mb-1 block text-neutral-500">Status</label>
-        <select
-          value={status}
-          onChange={(e) => { setStatus(e.target.value as Case["status"]); setDirty(true); }}
-          className="mb-4 rounded border border-neutral-300 px-2 py-1"
-        >
-          <option value="new">new</option>
-          <option value="in_progress">in progress</option>
-          <option value="resolved">resolved</option>
-        </select>
+        <div className="mb-4 flex gap-8">
+          <div>
+            <label className="mb-1 block text-neutral-500">Status</label>
+            <select
+              value={status}
+              onChange={(e) => { setStatus(e.target.value as Case["status"]); setDirty(true); }}
+              className="rounded border border-neutral-300 px-2 py-1"
+            >
+              <option value="new">new</option>
+              <option value="in_progress">in progress</option>
+              <option value="resolved">resolved</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-neutral-500">Urgency</label>
+            <select
+              value={urgency}
+              onChange={(e) => { setUrgency(e.target.value as Case["urgency"]); setDirty(true); }}
+              className="rounded border border-neutral-300 px-2 py-1"
+            >
+              <option value="low">low</option>
+              <option value="normal">normal</option>
+              <option value="urgent">urgent</option>
+            </select>
+          </div>
+        </div>
 
         <label className="mb-1 block text-neutral-500">Notes</label>
         <textarea
@@ -79,6 +97,22 @@ export default function CaseDetail() {
         </span>
       </div>
 
+      {data.events && data.events.length > 0 && (
+        <div className="mt-6 rounded bg-white p-4 text-sm shadow-sm">
+          <h2 className="mb-2 font-medium">History</h2>
+          <ul className="space-y-1 text-xs text-neutral-600">
+            {data.events.map((e) => (
+              <li key={e.id}>
+                {new Date(e.ts).toLocaleString()} — {e.actor}{" "}
+                {e.field === "notes"
+                  ? `added note: ${e.new}`
+                  : `changed ${e.field}: ${e.old || "—"} → ${e.new}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {data.calls?.map((call) => (
         <div key={call.id} className="mt-6 rounded bg-white p-4 text-sm shadow-sm">
           <div className="flex items-center gap-2">
@@ -90,6 +124,9 @@ export default function CaseDetail() {
             )}
             <span className="text-neutral-400">{new Date(call.started_at).toLocaleString()}</span>
           </div>
+          {call.summary && (
+            <p className="mt-2 text-xs italic text-neutral-600">{call.summary}</p>
+          )}
           <Transcript messages={call.messages} />
         </div>
       ))}

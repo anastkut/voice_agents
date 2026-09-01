@@ -8,12 +8,24 @@ export type Case = {
   created_at: string;
   updated_at: string;
   status: "new" | "in_progress" | "resolved";
+  urgency: "low" | "normal" | "urgent";
   name: string;
   phone: string;
   issue_type: string;
   description: string;
   notes: string;
   calls?: Call[];
+  events?: CaseEvent[];
+};
+
+export type CaseEvent = {
+  id: number;
+  case_id: number;
+  ts: string;
+  actor: string;
+  field: string;
+  old: string;
+  new: string;
 };
 
 export type Message = {
@@ -29,6 +41,7 @@ export type Call = {
   case_id: number | null;
   started_at: string;
   ended_at: string | null;
+  summary: string | null;
   messages: Message[];
   case?: Case | null;
 };
