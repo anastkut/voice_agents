@@ -22,7 +22,7 @@ You are the phone agent for EffiGov city services. You talk to residents by voic
 The entire call is in English; always reply in English even if a transcription line looks like another language.
 Speak plainly and briefly: one or two short sentences, one question at a time, no lists, no markdown, say digits one at a time. No filler and no repeated recaps. Ask only when information is missing, unclear, or contradictory — but then always ask.
 Two things you can do:
-1) New issue: collect full name, phone number, what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. Then call create_case, tell them their case number, and mention once that staff typically review new cases within two business days.
+1) New issue: collect full name, phone number, what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Before filing, repeat the name, phone number, and address back in one sentence to confirm; confirm other details only if unsure you heard them right. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. Then call create_case, tell them their case number, and mention once that staff typically review new cases within two business days.
 2) Existing request: ask for their phone number or case number, their full name, and a brief description of what the case is about. Call lookup_case and compare its result with what they told you: only if the name and description clearly match, share the status and offer to add a note with add_note. If they do not match, say you cannot share details on that case — do not reveal anything the tool returned and do not add notes. Never share case details based on a case number alone.
 Ask for each piece of information at most once per call: once the caller gives their name, phone number, or case details, retain and reuse them for the rest of the call. Never re-ask, and never re-verify a case created or already verified in this same call.
 If the caller shares extra useful details at any point (landmarks, access instructions, best times), save them to the case with add_note.
@@ -39,8 +39,10 @@ class IntakeAgent(Agent):
     def __init__(self, call_id: str):
         super().__init__(instructions=PROMPT)
         self.call_id = call_id
+        self.case_id: int | None = None
 
     async def _link_case(self, case_id: int):
+        self.case_id = case_id
         await backend.patch(f"/calls/{self.call_id}", json={"case_id": case_id})
 
     @function_tool
@@ -118,6 +120,8 @@ async def entrypoint(ctx: JobContext):
                        base_url=os.environ["TTS_BASE_URL"], api_key=os.environ["TTS_API_KEY"]),
     )
 
+    agent_obj = IntakeAgent(call_id)
+
     @session.on("conversation_item_added")
     def on_item(ev):
         item = ev.item
@@ -126,22 +130,41 @@ async def entrypoint(ctx: JobContext):
                                              json={"role": item.role, "text": item.text_content}))
 
     async def mark_ended():
-        lines = [f"{m.role}: {m.text_content}" for m in session.history.items
-                 if getattr(m, "role", None) in ("user", "assistant") and m.text_content]
+        lines = []
+        for m in session.history.items:
+            if getattr(m, "role", None) in ("user", "assistant") and m.text_content:
+                lines.append(f"{m.role}: {m.text_content}")
+            elif getattr(m, "output", None):
+                lines.append(f"tool: {m.output}")
+        transcript = "\n".join(lines)
+        summary = None
         try:
             resp = await oai.chat.completions.create(
                 model=os.environ["LLM_MODEL"],
                 messages=[{"role": "user", "content":
                            "Summarize this city-services call in two sentences for staff:"
-                           " issue, caller, outcome.\n\n" + "\n".join(lines)}])
+                           " issue, caller, outcome.\n\n" + transcript}])
             summary = resp.choices[0].message.content
+            if agent_obj.case_id:
+                review = await oai.chat.completions.create(
+                    model=os.environ["LLM_MODEL"],
+                    messages=[{"role": "user", "content":
+                               "You are a supervisor reviewing a city-services call. Compare what the"
+                               " assistant told the caller against the tool lines. Reply NONE if accurate;"
+                               " otherwise state in one or two sentences what the assistant said about"
+                               " cases, statuses, or timelines that the tools do not support.\n\n"
+                               + transcript}])
+                verdict = (review.choices[0].message.content or "").strip()
+                if verdict and not verdict.upper().startswith("NONE"):
+                    await backend.post(f"/cases/{agent_obj.case_id}/notes",
+                                       json={"text": f"Supervisor flag: {verdict}", "author": "supervisor"})
         except Exception:
-            summary = None  # the call must still be marked ended
+            pass  # the call must still be marked ended
         await backend.patch(f"/calls/{call_id}", json={"ended": True, "summary": summary})
 
     ctx.add_shutdown_callback(mark_ended)
 
-    await session.start(agent=IntakeAgent(call_id), room=ctx.room)
+    await session.start(agent=agent_obj, room=ctx.room)
     await ctx.connect()
     session.say(GREETING)
 
