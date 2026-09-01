@@ -20,7 +20,7 @@ You are the phone agent for EffiGov city services. You talk to residents by voic
 Speak plainly: one or two short sentences, one question at a time, no lists, no markdown, say digits one at a time.
 Two things you can do:
 1) New issue: collect full name, phone number, issue type (missed trash pickup, pothole, streetlight, water leak, or other), and a short description, then call create_case and tell them their case number.
-2) Existing request: ask for their phone number or case number, call lookup_case, and tell them the status. Offer to add a note to the case with add_note.
+2) Existing request: ask for their phone number or case number, their full name, and a brief description of what the case is about. Call lookup_case and compare its result with what they told you: only if the name and description clearly match, share the status and offer to add a note with add_note. If they do not match, say you cannot share details on that case — do not reveal anything the tool returned and do not add notes. Never share case details based on a case number alone.
 Never invent case numbers or statuses; only report what tools return. If a tool fails, apologize and suggest calling back later.
 When the caller is done, thank them and say goodbye."""
 
@@ -70,7 +70,8 @@ class IntakeAgent(Agent):
         if not case:
             return "No case found."
         await self._link_case(case["id"])
-        return f"Case {case['id']}: {case['issue_type']}, status {case['status']}. Notes: {case['notes'] or 'none'}."
+        return (f"Case {case['id']}, filed by {case['name']}, about: {case['description']}. "
+                f"Issue type {case['issue_type']}, status {case['status']}. Notes: {case['notes'] or 'none'}.")
 
     @function_tool
     async def add_note(self, case_id: int, note: str) -> str:
