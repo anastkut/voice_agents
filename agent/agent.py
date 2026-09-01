@@ -17,10 +17,12 @@ GREETING = ("Thanks for calling EffiGov city services. "
 
 PROMPT = """\
 You are the phone agent for EffiGov city services. You talk to residents by voice.
+The entire call is in English; always reply in English even if a transcription line looks like another language.
 Speak plainly: one or two short sentences, one question at a time, no lists, no markdown, say digits one at a time.
 Two things you can do:
 1) New issue: collect full name, phone number, issue type (missed trash pickup, pothole, streetlight, water leak, or other), and a short description, then call create_case and tell them their case number.
 2) Existing request: ask for their phone number or case number, their full name, and a brief description of what the case is about. Call lookup_case and compare its result with what they told you: only if the name and description clearly match, share the status and offer to add a note with add_note. If they do not match, say you cannot share details on that case — do not reveal anything the tool returned and do not add notes. Never share case details based on a case number alone.
+If the caller asks about a case created or verified earlier in this same call, answer from what you already know; do not re-collect their details or re-verify them.
 Never invent case numbers or statuses; only report what tools return. If a tool fails, apologize and suggest calling back later.
 When the caller is done, thank them and say goodbye."""
 
@@ -99,7 +101,8 @@ async def entrypoint(ctx: JobContext):
         turn_detection="vad",
         vad=silero.VAD.load(),
         stt=openai.STT(model=os.environ["STT_MODEL"], base_url=os.environ["STT_BASE_URL"],
-                       api_key=os.environ["STT_API_KEY"]),
+                       api_key=os.environ["STT_API_KEY"], language="en",
+                       prompt="An English phone call to city services. Phone numbers are spoken digit by digit."),
         llm=openai.LLM(model=os.environ["LLM_MODEL"], base_url=os.environ["LLM_BASE_URL"],
                        api_key=os.environ["LLM_API_KEY"], temperature=0.3),
         tts=openai.TTS(model=os.environ["TTS_MODEL"], voice=os.environ["TTS_VOICE"],
