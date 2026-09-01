@@ -1,6 +1,14 @@
+import secrets
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+
+# voice-friendly eight-letter words; STT transcribes them reliably
+WORDS = ["mountain", "elephant", "notebook", "sandwich", "umbrella", "triangle",
+         "hospital", "keyboard", "festival", "lavender", "magnetic", "particle",
+         "tomorrow", "treasure", "sunlight", "starfish", "campfire", "cucumber",
+         "hedgehog", "kangaroo", "flamingo", "cinnamon", "broccoli", "daffodil",
+         "eggplant", "goldfish", "seahorse", "squirrel", "reindeer", "tortoise"]
 
 conn = sqlite3.connect(Path(__file__).parent.parent / "effigov.db", check_same_thread=False)
 conn.row_factory = sqlite3.Row
@@ -8,7 +16,7 @@ conn.execute("""
     CREATE TABLE IF NOT EXISTS cases (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         created_at TEXT, updated_at TEXT, status TEXT, urgency TEXT DEFAULT 'normal',
-        secret_question TEXT, secret_answer TEXT, issue_type TEXT, description TEXT,
+        passphrase TEXT, issue_type TEXT, description TEXT,
         notes TEXT DEFAULT ''
     )
 """)
@@ -39,19 +47,27 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
 
-def create_case(issue_type: str, description: str, secret_question: str,
-                secret_answer: str, urgency: str, actor: str = "staff") -> dict:
+def create_case(issue_type: str, description: str, urgency: str, actor: str = "staff") -> dict:
     ts = now()
+    passphrase = " ".join(secrets.SystemRandom().sample(WORDS, 4))
     with conn:
         cur = conn.execute(
-            "INSERT INTO cases (created_at, updated_at, status, urgency, secret_question,"
-            " secret_answer, issue_type, description) VALUES (?, ?, 'new', ?, ?, ?, ?, ?)",
-            (ts, ts, urgency, secret_question, secret_answer, issue_type, description),
+            "INSERT INTO cases (created_at, updated_at, status, urgency, passphrase,"
+            " issue_type, description) VALUES (?, ?, 'new', ?, ?, ?, ?)",
+            (ts, ts, urgency, passphrase, issue_type, description),
         )
         conn.execute(
             "INSERT INTO case_events (case_id, ts, actor, field, old, new) VALUES (?, ?, ?, 'created', '', ?)",
             (cur.lastrowid, ts, actor, issue_type))
     return get_case(cur.lastrowid)
+
+
+def verify_case(case_id: int, passphrase: str) -> dict | None:
+    canon = lambda s: "".join(ch for ch in s.lower() if ch.isalpha())
+    case = get_case(case_id)
+    if case and canon(passphrase) == canon(case["passphrase"]):
+        return case
+    return None  # same answer for wrong id and wrong phrase: existence stays hidden
 
 
 def list_cases() -> list[dict]:

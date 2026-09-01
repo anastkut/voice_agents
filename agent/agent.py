@@ -22,8 +22,8 @@ You are the phone agent for EffiGov city services. You talk to residents by voic
 The entire call is in English; always reply in English even if a transcription line looks like another language.
 Speak plainly and briefly: one or two short sentences, one question at a time, no lists, no markdown, say digits one at a time. No filler and no repeated recaps. Ask only when information is missing, unclear, or contradictory — but then always ask.
 Three things you can do:
-1) New issue: collect what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. Then have them choose a verification question and answer only they would know (for example a childhood nickname) — no personal contact details are collected or stored. Repeat the location and their verification answer back once to confirm, call create_case, tell them their case number and to keep it for follow-ups, and mention once that staff typically review new cases within two business days.
-2) Existing request: ask for the case number and call lookup_case, then ask the caller its verification question. Only if their answer clearly matches the expected one, share the status and offer add_note. Otherwise say you cannot share details on that case — do not reveal anything the tool returned, do not add notes, and do not change it. Never share case details without a matching verification answer.
+1) New issue: collect what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. No personal contact details are collected or stored. Repeat the location back once to confirm, call create_case, then give them their case number and read the four-word passphrase slowly, word by word; tell them both are needed for any follow-up, and mention once that staff typically review new cases within two business days.
+2) Existing request: ask for the case number and their four-word passphrase, then call lookup_case. On a match, share the status and offer add_note. If it fails, say only that no case matches that number and passphrase — never confirm or deny that a case exists, and change nothing.
 3) Cancel a request: verify the caller exactly like an existing request (no verification needed for a case from this same call), then call cancel_case and confirm it is cancelled.
 If a verified caller says an existing problem got worse or better, adjust it with set_urgency.
 Ask for each piece of information at most once per call: once the caller gives details or passes verification, retain that for the rest of the call. Never re-ask, and never re-verify a case created or already verified in this same call.
@@ -49,43 +49,40 @@ class IntakeAgent(Agent):
 
     @function_tool
     async def create_case(self, issue_type: IssueType, description: str,
-                          secret_question: str, secret_answer: str,
                           urgency: Literal["low", "normal", "urgent"] = "normal") -> str:
-        """File a new service request case.
+        """File a new service request case. Returns the case number and the
+        generated four-word passphrase to read to the caller.
 
         Args:
             issue_type: Category of the reported issue.
             description: Short description of the issue, including its location.
-            secret_question: Verification question the caller chose for future calls.
-            secret_answer: The caller's answer to that question.
             urgency: urgent for safety hazards or active damage, low for cosmetic issues.
         """
         r = await backend.post("/cases", json={
             "issue_type": issue_type, "description": description,
-            "secret_question": secret_question, "secret_answer": secret_answer,
             "urgency": urgency, "actor": "caller",
         })
         r.raise_for_status()
-        case_id = r.json()["id"]
-        await self._link_case(case_id)
-        return f"Created case number {case_id}."
+        case = r.json()
+        await self._link_case(case["id"])
+        return f"Created case number {case['id']}. Passphrase: {case['passphrase']}."
 
     @function_tool
-    async def lookup_case(self, case_id: int) -> str:
-        """Look up an existing case by case number. Ask the caller the returned
-        verification question before sharing anything from the result.
+    async def lookup_case(self, case_id: int, passphrase: str) -> str:
+        """Look up a case. The backend returns it only if the four-word passphrase
+        matches; otherwise nothing is revealed, not even whether the case exists.
 
         Args:
             case_id: Case number.
+            passphrase: The four words given to the caller when the case was created.
         """
-        r = await backend.get(f"/cases/{case_id}")
+        r = await backend.get(f"/cases/{case_id}/verify", params={"passphrase": passphrase})
         if r.status_code != 200:
-            return "No case found."
+            return "No case matches that number and passphrase."
         case = r.json()
         await self._link_case(case["id"])
         return (f"Case {case['id']}: {case['issue_type']}, status {case['status']}, "
-                f"about: {case['description']}. Verification question: {case['secret_question']} "
-                f"Expected answer: {case['secret_answer']}. Notes: {case['notes'] or 'none'}.")
+                f"about: {case['description']}. Notes: {case['notes'] or 'none'}.")
 
     @function_tool
     async def set_urgency(self, case_id: int, urgency: Literal["low", "normal", "urgent"]) -> str:

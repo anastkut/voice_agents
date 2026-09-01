@@ -40,8 +40,8 @@ the layout, so a call survives navigation and ends only on hang up.
 ## Data model
 
 ```
-cases        id, created_at, updated_at, status, urgency, secret_question,
-             secret_answer, issue_type, description, notes
+cases        id, created_at, updated_at, status, urgency, passphrase,
+             issue_type, description, notes
 calls        id, case_id → cases, started_at, ended_at, summary
 messages     id, call_id → calls, ts, role, text          (transcript history)
 case_events  id, case_id → cases, ts, actor, field, old, new   (audit trail)
@@ -54,11 +54,11 @@ as an exit. Records are never deleted.
 ## Authority
 
 - **Caller** (via agent tools): create a case, look up / note / re-prioritize /
-  cancel their own. No personal contact details are stored: at creation the caller
-  chooses a secret verification question + answer, and follow-up calls must answer
-  it — a case number alone discloses nothing. Verification is prompt-level here;
-  in production the comparison moves inside the tool so the stored answer never
-  enters the LLM context.
+  cancel their own. No personal contact details are stored: at creation the backend
+  generates a four-word passphrase (read to the caller once), and follow-up lookups
+  go through `/cases/{id}/verify`, which compares server-side and returns the same
+  "not found" whether the id or the phrase is wrong — the LLM never sees the stored
+  passphrase, and a case's existence is never disclosed without a match.
 - **Staff** (dashboard): everything, including the workflow ladder.
 - **Supervisor** (post-call LLM pass): annotate only.
 

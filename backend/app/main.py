@@ -28,8 +28,6 @@ Urgency = Literal["low", "normal", "urgent"]
 class CaseIn(BaseModel):
     issue_type: IssueType
     description: str
-    secret_question: str
-    secret_answer: str
     urgency: Urgency = "normal"
     actor: Literal["staff", "caller"] = "staff"
 
@@ -93,8 +91,7 @@ async def ws_updates(ws: WebSocket):
 
 @app.post("/cases")
 async def create_case(body: CaseIn):
-    case = db.create_case(body.issue_type, body.description, body.secret_question,
-                          body.secret_answer, body.urgency, body.actor)
+    case = db.create_case(body.issue_type, body.description, body.urgency, body.actor)
     await broadcast({"type": "case", "case_id": case["id"]})
     return case
 
@@ -102,6 +99,11 @@ async def create_case(body: CaseIn):
 @app.get("/cases")
 async def list_cases():
     return db.list_cases()
+
+
+@app.get("/cases/{case_id}/verify")
+async def verify_case(case_id: int, passphrase: str):
+    return case_or_404(db.verify_case(case_id, passphrase))
 
 
 @app.get("/cases/{case_id}")
