@@ -25,7 +25,7 @@ Two things you can do:
 1) New issue: collect full name, phone number, what the problem is, the exact location (street address, plus apartment or unit number when relevant), and a short description; include the location in the description. Classify the problem into the closest create_case issue type yourself; use other if none fits — do not read the category list to the caller. Before filing, repeat the name, phone number, and address back in one sentence to confirm; confirm other details only if unsure you heard them right. Judge urgency yourself: urgent for safety hazards or active damage, low for cosmetic issues. Then call create_case, tell them their case number, and mention once that staff typically review new cases within two business days.
 2) Existing request: ask for their phone number or case number, their full name, and a brief description of what the case is about. Call lookup_case and compare its result with what they told you: only if the name and description clearly match, share the status and offer to add a note with add_note. If they do not match, say you cannot share details on that case — do not reveal anything the tool returned and do not add notes. Never share case details based on a case number alone.
 Ask for each piece of information at most once per call: once the caller gives their name, phone number, or case details, retain and reuse them for the rest of the call. Never re-ask, and never re-verify a case created or already verified in this same call.
-If the caller shares extra useful details at any point (landmarks, access instructions, best times), save them to the case with add_note.
+If the caller shares concrete, actionable extras (landmarks, access instructions, best times), save them with add_note; do not note general questions or chatter.
 If the caller asks for a human or you cannot help, make sure a case exists (create one if needed), add a note that they requested human follow-up, and say a staff member will call them back.
 Do not promise repair dates; if asked, say updates will appear on their case and staff review new cases within about two business days.
 Never invent case numbers or statuses; only report what tools return. If a tool fails, apologize and suggest calling back later.
@@ -112,8 +112,7 @@ async def entrypoint(ctx: JobContext):
         turn_detection="vad",
         vad=silero.VAD.load(),
         stt=openai.STT(model=os.environ["STT_MODEL"], base_url=os.environ["STT_BASE_URL"],
-                       api_key=os.environ["STT_API_KEY"], language="en",
-                       prompt="An English phone call to city services. Phone numbers are spoken digit by digit."),
+                       api_key=os.environ["STT_API_KEY"], language="en"),
         llm=openai.LLM(model=os.environ["LLM_MODEL"], base_url=os.environ["LLM_BASE_URL"],
                        api_key=os.environ["LLM_API_KEY"], temperature=0.3),
         tts=openai.TTS(model=os.environ["TTS_MODEL"], voice=os.environ["TTS_VOICE"],
@@ -149,11 +148,12 @@ async def entrypoint(ctx: JobContext):
                 review = await oai.chat.completions.create(
                     model=os.environ["LLM_MODEL"],
                     messages=[{"role": "user", "content":
-                               "You are a supervisor reviewing a city-services call. Compare what the"
-                               " assistant told the caller against the tool lines. Reply NONE if accurate;"
-                               " otherwise state in one or two sentences what the assistant said about"
-                               " cases, statuses, or timelines that the tools do not support.\n\n"
-                               + transcript}])
+                               "You are a supervisor reviewing a city-services call. The assistant's"
+                               " standing instructions were:\n" + PROMPT + "\n\nCompare what the assistant"
+                               " told the caller against the tool lines and those instructions. Reply NONE"
+                               " if everything is supported; otherwise state in one or two sentences what"
+                               " the assistant said about cases, statuses, or timelines that neither the"
+                               " tools nor its instructions support.\n\n" + transcript}])
                 verdict = (review.choices[0].message.content or "").strip()
                 if verdict and not verdict.upper().startswith("NONE"):
                     await backend.post(f"/cases/{agent_obj.case_id}/notes",
