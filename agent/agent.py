@@ -95,6 +95,8 @@ async def entrypoint(ctx: JobContext):
     await backend.post("/calls", json={"id": call_id})
 
     session = AgentSession(
+        # explicit local VAD turn detection; the default tries LiveKit Cloud's paid gateway
+        turn_detection="vad",
         vad=silero.VAD.load(),
         stt=openai.STT(model=os.environ["STT_MODEL"], base_url=os.environ["STT_BASE_URL"],
                        api_key=os.environ["STT_API_KEY"]),

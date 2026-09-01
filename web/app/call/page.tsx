@@ -9,10 +9,15 @@ export default function CallPage() {
   const [room] = useState(() => new Room());
   const [state, setState] = useState("idle");
 
+  // Hang up when leaving the page: the audio element and mic live here,
+  // so an abandoned room would keep the mic open with no way to hear or stop it.
   useEffect(() => {
     const update = () => setState(room.state === "disconnected" ? "idle" : room.state);
     room.on(RoomEvent.ConnectionStateChanged, update);
-    return () => void room.off(RoomEvent.ConnectionStateChanged, update);
+    return () => {
+      room.off(RoomEvent.ConnectionStateChanged, update);
+      room.disconnect();
+    };
   }, [room]);
 
   const call = async () => {
@@ -42,6 +47,7 @@ export default function CallPage() {
           Call city services
         </button>
       )}
+      <p className="mt-4 text-xs text-neutral-400">Leaving this page ends the call.</p>
     </RoomContext.Provider>
   );
 }
