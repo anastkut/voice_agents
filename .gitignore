@@ -1,0 +1,13 @@
+.env
+*.db
+.venv/
+node_modules/
+.next/
+__pycache__/
+*.pdf
+.DS_Store
+
+# internal working notes, never shipped
+CLAUDE.md
+IMPLEMENT*
+AGENTS.md
