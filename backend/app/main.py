@@ -20,7 +20,8 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"],
                    allow_methods=["*"], allow_headers=["*"])
 
-IssueType = Literal["missed_pickup", "pothole", "streetlight", "water_leak", "other"]
+IssueType = Literal["missed_pickup", "pothole", "streetlight", "water_leak", "noise_complaint",
+                    "graffiti", "fallen_tree", "illegal_dumping", "sidewalk_damage", "other"]
 Urgency = Literal["low", "normal", "urgent"]
 
 

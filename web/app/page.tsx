@@ -18,6 +18,11 @@ const URGENCY_STYLE: Record<Case["urgency"], string> = {
   urgent: "bg-red-100 text-red-800",
 };
 
+const ISSUE_TYPES = [
+  "missed_pickup", "pothole", "streetlight", "water_leak", "noise_complaint",
+  "graffiti", "fallen_tree", "illegal_dumping", "sidewalk_damage", "other",
+];
+
 export default function CaseList() {
   useLive();
   const { data: cases } = useSWR<Case[]>("/cases", fetcher, { refreshInterval: 2000 });
@@ -25,11 +30,13 @@ export default function CaseList() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
   const [urgency, setUrgency] = useState("all");
+  const [issue, setIssue] = useState("all");
 
   const shown = (cases ?? []).filter(
     (c) =>
       (status === "all" || c.status === status) &&
       (urgency === "all" || c.urgency === urgency) &&
+      (issue === "all" || c.issue_type === issue) &&
       `${c.name} ${c.phone} ${c.description}`.toLowerCase().includes(q.toLowerCase())
   );
 
@@ -63,6 +70,16 @@ export default function CaseList() {
           <option value="urgent">urgent</option>
           <option value="normal">normal</option>
           <option value="low">low</option>
+        </select>
+        <select
+          value={issue}
+          onChange={(e) => setIssue(e.target.value)}
+          className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
+        >
+          <option value="all">all issues</option>
+          {ISSUE_TYPES.map((t) => (
+            <option key={t} value={t}>{t.replaceAll("_", " ")}</option>
+          ))}
         </select>
       </div>
       {!cases ? (
