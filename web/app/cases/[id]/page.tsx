@@ -67,6 +67,8 @@ export default function CaseDetail() {
               className="rounded border border-neutral-300 px-2 py-1"
             >
               <option value="new">new</option>
+              <option value="triaged">triaged</option>
+              <option value="scheduled">scheduled</option>
               <option value="in_progress">in progress</option>
               <option value="resolved">resolved</option>
             </select>

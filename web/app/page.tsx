@@ -8,6 +8,8 @@ import Transcript from "./transcript";
 
 const STATUS_STYLE: Record<Case["status"], string> = {
   new: "bg-blue-100 text-blue-800",
+  triaged: "bg-violet-100 text-violet-800",
+  scheduled: "bg-cyan-100 text-cyan-800",
   in_progress: "bg-amber-100 text-amber-800",
   resolved: "bg-green-100 text-green-800",
 };
@@ -58,6 +60,8 @@ export default function CaseList() {
         >
           <option value="all">all statuses</option>
           <option value="new">new</option>
+          <option value="triaged">triaged</option>
+          <option value="scheduled">scheduled</option>
           <option value="in_progress">in progress</option>
           <option value="resolved">resolved</option>
         </select>

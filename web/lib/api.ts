@@ -7,7 +7,7 @@ export type Case = {
   id: number;
   created_at: string;
   updated_at: string;
-  status: "new" | "in_progress" | "resolved";
+  status: "new" | "triaged" | "scheduled" | "in_progress" | "resolved";
   urgency: "low" | "normal" | "urgent";
   name: string;
   phone: string;
