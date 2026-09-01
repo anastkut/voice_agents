@@ -20,3 +20,6 @@ export const patchCase = (id: number, body: Partial<Case>) =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   }).then((r) => r.json());
+
+export const getToken = () =>
+  fetcher("/livekit/token") as Promise<{ url: string; token: string }>;

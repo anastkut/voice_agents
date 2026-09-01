@@ -1,13 +1,20 @@
+import os
+from secrets import token_hex
 from typing import Literal
 
 from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from livekit import api
 from pydantic import BaseModel
 
 from app import db
 
 load_dotenv(find_dotenv())
+
+LIVEKIT_URL = os.environ["LIVEKIT_URL"]
+LIVEKIT_API_KEY = os.environ["LIVEKIT_API_KEY"]
+LIVEKIT_API_SECRET = os.environ["LIVEKIT_API_SECRET"]
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"],
@@ -64,3 +71,14 @@ async def patch_case(case_id: int, body: CasePatch):
 @app.post("/cases/{case_id}/notes")
 async def add_note(case_id: int, body: NoteIn):
     return case_or_404(db.add_note(case_id, body.text, body.author))
+
+
+@app.get("/livekit/token")
+async def livekit_token():
+    token = (
+        api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+        .with_identity("resident-" + token_hex(4))
+        .with_grants(api.VideoGrants(room_join=True, room="call-" + token_hex(4)))
+        .to_jwt()
+    )
+    return {"url": LIVEKIT_URL, "token": token}

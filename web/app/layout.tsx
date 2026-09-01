@@ -14,6 +14,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="text-sm text-neutral-600 hover:text-neutral-900">
               Dashboard
             </Link>
+            <Link href="/call" className="text-sm text-neutral-600 hover:text-neutral-900">
+              Simulate call
+            </Link>
           </nav>
         </header>
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
